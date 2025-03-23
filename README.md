@@ -17,11 +17,15 @@ jq '[.messages | map({content: .content, author: .author.name, embed: (.embeds |
 ## Command usage
 
 ```sh
-cargo run --release <input.json> <username (optional)>
+cargo run --release  (scrape|markov) <input_file> <username>
 ```
+
+For analysis, it'll sort all words used by occurrence and write the top 1000 to an output.txt file.
+
+For markov chain generation, it'll generate 5 iterations of 50 words.
 
 If a username is specified, it will only generate for that specific user.
 
-I added a function for word usage analysis but it's currently commented. You can uncomment and run it if you wish. If i make a better cli, this readme will be updated.
+I will consider expanding the cli later. But right now I don't to add more dependencies and im lazy so just edit the code and rerun it if you care.
 
 

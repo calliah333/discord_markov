@@ -29,9 +29,9 @@ fn parse_buffered(m: &mut Messages, file: &String){
 }
 
 #[allow(dead_code)]
-fn analysis(m: &Vec<Message>){
+fn analysis(m: &Messages){
     let mut hm: HashMap<String, u32> = HashMap::new();
-    for msg in m {
+    for msg in &m.messages {
         if msg.embed {
             continue;
         }
@@ -60,7 +60,7 @@ fn analysis(m: &Vec<Message>){
 
 
 // None for all users, Some("uname") for specific user
-fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Option<&str>){
+fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Option<&String>){
     for msg in &messages.messages {
         if msg.embed{
             continue;
@@ -68,7 +68,7 @@ fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Opti
         match user {
             None => markov.add_text(&msg.content),
             Some(uname) => {
-                if uname == msg.author {
+                if *uname == msg.author {
                     markov.add_text(&msg.content);
                 }
             }
@@ -80,25 +80,41 @@ fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Opti
 //TODO: Compare word usage to a normal corpus of text. Try using internet text
 
 /// Usage:
-///     scrape <input_file> <uname (optional)>
+///     
+/// Scraping:
+///     cargo run --release scrape <input_file> <uname (optional)>
+/// 
+/// Analysis:
+///     cargo run --release analysis <input_file>    
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: scrape <input_file> <uname (optional)");
+    let args: Vec<String> = env::args().collect(); // [location, command, input, username]
+
+    if args.len() < 3 { 
+        println!("Usage: (markov|analysis) <input_file> <username>");
         return;
     }
-    let input_file = args.get(1).unwrap();
-    let mut user = None;
-    if args.len() > 2 {
-        user = Some(args.get(2).unwrap().as_str());
-    }
 
+    let input_file = args.get(2).unwrap();
     let mut now = Instant::now();
     let mut v: Messages = Messages {  messages: Vec::new() } ; 
-    let mut m: RawMarkovChain<4> = markov_str::MarkovChain::new(2, Regex::new(WORD_REGEX).unwrap());
     parse_buffered(&mut v, input_file);
     println!("Parsed input in {}ms", now.elapsed().as_millis());
     now = Instant::now();
+
+    let command = args.get(1).unwrap();
+    if command == "analysis" {
+        analysis(&v);
+        println!("Analyzed word usages in {}ms", now.elapsed().as_millis());
+        println!("Wrote to output.txt");
+        return;
+    }
+    
+    let mut user = None;
+    if args.len() > 3 {
+        user = Some(args.get(3).unwrap());
+    }
+
+    let mut m: RawMarkovChain<4> = markov_str::MarkovChain::new(2, Regex::new(WORD_REGEX).unwrap());
     create_markov(&v, &mut m, user);
     println!("Created markov in {}ms", now.elapsed().as_millis());
 
@@ -107,6 +123,5 @@ fn main() {
         println!("{}", m.generate(50, &mut rng).unwrap());
         print!("\n");
     }
-    // analysis();
 }
 
