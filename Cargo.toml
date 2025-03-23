@@ -1,0 +1,11 @@
+[package]
+name = "hcord_scrape"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+markov_str = "0.3.0"
+rand = "0.8.5"
+regex = "1.11.1"
+serde = {version="1.0", features=["derive"]}
+serde_json = "1.0.140"
