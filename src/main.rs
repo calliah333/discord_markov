@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Write};
 use std::fs::File;
+use std::time::Instant;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
 use markov_str::*;
@@ -92,10 +93,14 @@ fn main() {
         user = Some(args.get(2).unwrap().as_str());
     }
 
+    let mut now = Instant::now();
     let mut v: Messages = Messages {  messages: Vec::new() } ; 
     let mut m: RawMarkovChain<4> = markov_str::MarkovChain::new(2, Regex::new(WORD_REGEX).unwrap());
     parse_buffered(&mut v, input_file);
+    println!("Parsed input in {}ms", now.elapsed().as_millis());
+    now = Instant::now();
     create_markov(&v, &mut m, user);
+    println!("Created markov in {}ms", now.elapsed().as_millis());
 
     let mut rng = ThreadRng::default();
     for _ in 0..5{

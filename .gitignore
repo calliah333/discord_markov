@@ -2,3 +2,6 @@
 *.json
 .DS_Store
 *.txt
+*.7z
+*.gz
+
