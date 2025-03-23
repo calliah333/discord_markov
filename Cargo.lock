@@ -36,6 +36,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "discord_markov"
+version = "0.1.0"
+dependencies = [
+ "markov_str",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -77,17 +88,6 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
-]
-
-[[package]]
-name = "hcord_scrape"
-version = "0.1.0"
-dependencies = [
- "markov_str",
- "rand",
- "regex",
- "serde",
- "serde_json",
 ]
 
 [[package]]
