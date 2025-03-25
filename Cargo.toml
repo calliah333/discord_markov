@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 markov_str = "0.3.0"
-rand = "0.8.5"
+rand = "0.8.5" # markov_str wants 0.8.5 and breaks on 0.9 so lol
 regex = "1.11.1"
-serde = {version="1.0", features=["derive"]}
-serde_json = "1.0.140"
+rusqlite = { version = "0.34.0", features = ["bundled"]}

@@ -4,4 +4,6 @@
 *.txt
 *.7z
 *.gz
-
+/.idea
+*.csv
+*.db

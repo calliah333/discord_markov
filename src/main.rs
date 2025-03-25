@@ -1,42 +1,25 @@
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Write};
+use std::io::{Write};
 use std::fs::File;
 use std::time::Instant;
 use rand::rngs::ThreadRng;
-use serde::Deserialize;
 use markov_str::*;
 use regex::Regex;
+use rusqlite::{Connection, Result};
 
-#[derive(Deserialize)]
-struct Message {
-    author: String,
-    content: String,
-    embed: bool
-}
-
-#[derive(Deserialize)]
-struct Messages {
-    messages: Vec<Message>
-}
-
-
-fn parse_buffered(m: &mut Messages, file: &String){
-    let file = File::open(file).unwrap();
-    let reader = BufReader::new(file);
-    *m = serde_json::from_reader(reader).unwrap();
-    println!("parsed {} messages", m.messages.len());
-}
-
-#[allow(dead_code)]
-fn analysis(m: &Messages){
+fn analysis(conn : &Connection) -> Result<()> {
+    let mut statement = conn.prepare("SELECT content, embed FROM messages")?;
+    let mut rows = statement.query([])?;
     let mut hm: HashMap<String, u32> = HashMap::new();
-    for msg in &m.messages {
-        if msg.embed {
+    while let Some(row) = rows.next()? {
+        let msg:String = row.get(0)?;
+        let embed: bool = row.get(1)?;
+        if embed {
             continue;
         }
-        for word in msg.content.split_whitespace() {
-            *hm.entry(word.to_string().to_lowercase()).or_insert(0) += 1;
+        for word in msg.split_whitespace() {
+            *hm.entry(word.to_string()).or_default() += 1;
         }
     }
 
@@ -55,26 +38,31 @@ fn analysis(m: &Messages){
         writeln!(&mut output, "{n} : {w}").unwrap();
     }
     output.flush().unwrap();
-    
+    Ok(())
 }
 
+fn create_markov_from_db(conn: &Connection, markov: &mut RawMarkovChain<4>, user: Option<&String>) -> Result<()> {
+    let sql = if user.is_some() {
+        "SELECT content FROM messages WHERE author = ?1"
+    } else {
+        "SELECT content FROM messages"
+    };
 
-// None for all users, Some("uname") for specific user
-fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Option<&String>){
-    for msg in &messages.messages {
-        if msg.embed{
-            continue;
-        }
-        match user {
-            None => markov.add_text(&msg.content),
-            Some(uname) => {
-                if *uname == msg.author {
-                    markov.add_text(&msg.content);
-                }
-            }
-        }
+    let mut statement = conn.prepare(sql)?;
+
+    let mut rows = if let Some(user_value) = user {
+        statement.query([user_value])?
+    } else {
+        statement.query([])?
+    };
+
+    while let Some(row) = rows.next()? {
+        let msg:String = row.get(0)?;
+        markov.add_text(&msg);
     }
+    Ok(())
 }
+
 
 
 //TODO: Compare word usage to a normal corpus of text. Try using internet text
@@ -82,46 +70,42 @@ fn create_markov(messages: &Messages, markov: &mut RawMarkovChain<4>, user: Opti
 /// Usage:
 ///     
 /// Scraping:
-///     cargo run --release scrape <input_file> <uname (optional)>
+///     cargo run --release markov <uname (optional)>
 /// 
 /// Analysis:
-///     cargo run --release analysis <input_file>    
-fn main() {
+///     cargo run --release analysis   
+fn main() -> Result<()>{
     let args: Vec<String> = env::args().collect(); // [location, command, input, username]
 
-    if args.len() < 3 { 
-        println!("Usage: (markov|analysis) <input_file> <username>");
-        return;
+    if args.len() < 2 { 
+        println!("Usage: (markov|analysis) <username>");
+        return Ok(());
     }
-
-    let input_file = args.get(2).unwrap();
-    let mut now = Instant::now();
-    let mut v: Messages = Messages {  messages: Vec::new() } ; 
-    parse_buffered(&mut v, input_file);
-    println!("Parsed input in {}ms", now.elapsed().as_millis());
-    now = Instant::now();
-
+    
+    let conn = Connection::open("messages.db")?;
+    println!("Opened connection to database");
+    let start = Instant::now();
     let command = args.get(1).unwrap();
     if command == "analysis" {
-        analysis(&v);
-        println!("Analyzed word usages in {}ms", now.elapsed().as_millis());
-        println!("Wrote to output.txt");
-        return;
+        analysis(&conn)?;
+        println!("Analyzed and wrote in {}ms", start.elapsed().as_millis());
+        return Ok(());
     }
     
     let mut user = None;
-    if args.len() > 3 {
-        user = Some(args.get(3).unwrap());
+    if args.len() > 2 {
+        user = Some(args.get(2).unwrap());
     }
 
-    let mut m: RawMarkovChain<4> = markov_str::MarkovChain::new(2, Regex::new(WORD_REGEX).unwrap());
-    create_markov(&v, &mut m, user);
-    println!("Created markov in {}ms", now.elapsed().as_millis());
-
+    let mut m: RawMarkovChain<4> = MarkovChain::new(2, Regex::new(WORD_REGEX).unwrap());
+    create_markov_from_db(&conn, &mut m, user)?;
+    println!("Read from db and created markov in {}ms", start.elapsed().as_millis());
+    
     let mut rng = ThreadRng::default();
     for _ in 0..5{
-        println!("{}", m.generate(50, &mut rng).unwrap());
-        print!("\n");
+        println!("{}\n", m.generate(50, &mut rng).unwrap());
     }
+
+    Ok(())
 }
 
